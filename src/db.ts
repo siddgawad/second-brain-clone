@@ -1,7 +1,9 @@
 import mongoose, {Schema} from "mongoose";
+import dotenv from "dotenv";
 
-mongoose.connect("mongodb+srv://siddhantgawad4:88ohE5lhf0RBvcFY@cluster0.efqnhws.mongodb.net/course-seller?retryWrites=true&w=majority&appName=Cluster0");
+dotenv.config();
 
+mongoose.connect(process.env.MONGO_URL as string);
 const userSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true },
     password: { type: String, required: true },
