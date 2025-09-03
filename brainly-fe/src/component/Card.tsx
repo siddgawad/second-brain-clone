@@ -25,6 +25,7 @@ export default function Card({title,link,type}:CardProps){
     <div className="pr-2 text-gray-500">
         <a href={link} target="_blank">
             <ShareIcon />
+
             </a>
             </div>
   

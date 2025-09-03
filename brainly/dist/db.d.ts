@@ -85,6 +85,54 @@ export declare const contentModel: mongoose.Model<{
         createFromBase64?: any;
         isValid?: any;
     } | null;
+    createdAt?: {
+        toJSON?: {} | null;
+        [Symbol.toPrimitive]?: {} | null;
+        toString?: {} | null;
+        toLocaleString?: {} | null;
+        toDateString?: {} | null;
+        toTimeString?: {} | null;
+        toLocaleDateString?: {} | null;
+        toLocaleTimeString?: {} | null;
+        getTime?: {} | null;
+        getFullYear?: {} | null;
+        getUTCFullYear?: {} | null;
+        getMonth?: {} | null;
+        getUTCMonth?: {} | null;
+        getDate?: {} | null;
+        getUTCDate?: {} | null;
+        getDay?: {} | null;
+        getUTCDay?: {} | null;
+        getHours?: {} | null;
+        getUTCHours?: {} | null;
+        getMinutes?: {} | null;
+        getUTCMinutes?: {} | null;
+        getSeconds?: {} | null;
+        getUTCSeconds?: {} | null;
+        getMilliseconds?: {} | null;
+        getUTCMilliseconds?: {} | null;
+        getTimezoneOffset?: {} | null;
+        setTime?: {} | null;
+        setMilliseconds?: {} | null;
+        setUTCMilliseconds?: {} | null;
+        setSeconds?: {} | null;
+        setUTCSeconds?: {} | null;
+        setMinutes?: {} | null;
+        setUTCMinutes?: {} | null;
+        setHours?: {} | null;
+        setUTCHours?: {} | null;
+        setDate?: {} | null;
+        setUTCDate?: {} | null;
+        setMonth?: {} | null;
+        setUTCMonth?: {} | null;
+        setFullYear?: {} | null;
+        setUTCFullYear?: {} | null;
+        toUTCString?: {} | null;
+        toISOString?: {} | null;
+        getVarDate?: {} | null;
+        valueOf?: {} | null;
+    } | null;
+    isActive?: unknown;
 }, {}, {}, {}, mongoose.Document<unknown, {}, {
     tags: mongoose.Types.DocumentArray<{
         prototype?: unknown;
@@ -123,6 +171,54 @@ export declare const contentModel: mongoose.Model<{
         createFromBase64?: any;
         isValid?: any;
     } | null;
+    createdAt?: {
+        toJSON?: {} | null;
+        [Symbol.toPrimitive]?: {} | null;
+        toString?: {} | null;
+        toLocaleString?: {} | null;
+        toDateString?: {} | null;
+        toTimeString?: {} | null;
+        toLocaleDateString?: {} | null;
+        toLocaleTimeString?: {} | null;
+        getTime?: {} | null;
+        getFullYear?: {} | null;
+        getUTCFullYear?: {} | null;
+        getMonth?: {} | null;
+        getUTCMonth?: {} | null;
+        getDate?: {} | null;
+        getUTCDate?: {} | null;
+        getDay?: {} | null;
+        getUTCDay?: {} | null;
+        getHours?: {} | null;
+        getUTCHours?: {} | null;
+        getMinutes?: {} | null;
+        getUTCMinutes?: {} | null;
+        getSeconds?: {} | null;
+        getUTCSeconds?: {} | null;
+        getMilliseconds?: {} | null;
+        getUTCMilliseconds?: {} | null;
+        getTimezoneOffset?: {} | null;
+        setTime?: {} | null;
+        setMilliseconds?: {} | null;
+        setUTCMilliseconds?: {} | null;
+        setSeconds?: {} | null;
+        setUTCSeconds?: {} | null;
+        setMinutes?: {} | null;
+        setUTCMinutes?: {} | null;
+        setHours?: {} | null;
+        setUTCHours?: {} | null;
+        setDate?: {} | null;
+        setUTCDate?: {} | null;
+        setMonth?: {} | null;
+        setUTCMonth?: {} | null;
+        setFullYear?: {} | null;
+        setUTCFullYear?: {} | null;
+        toUTCString?: {} | null;
+        toISOString?: {} | null;
+        getVarDate?: {} | null;
+        valueOf?: {} | null;
+    } | null;
+    isActive?: unknown;
 }, {}, mongoose.DefaultSchemaOptions> & {
     tags: mongoose.Types.DocumentArray<{
         prototype?: unknown;
@@ -161,6 +257,54 @@ export declare const contentModel: mongoose.Model<{
         createFromBase64?: any;
         isValid?: any;
     } | null;
+    createdAt?: {
+        toJSON?: {} | null;
+        [Symbol.toPrimitive]?: {} | null;
+        toString?: {} | null;
+        toLocaleString?: {} | null;
+        toDateString?: {} | null;
+        toTimeString?: {} | null;
+        toLocaleDateString?: {} | null;
+        toLocaleTimeString?: {} | null;
+        getTime?: {} | null;
+        getFullYear?: {} | null;
+        getUTCFullYear?: {} | null;
+        getMonth?: {} | null;
+        getUTCMonth?: {} | null;
+        getDate?: {} | null;
+        getUTCDate?: {} | null;
+        getDay?: {} | null;
+        getUTCDay?: {} | null;
+        getHours?: {} | null;
+        getUTCHours?: {} | null;
+        getMinutes?: {} | null;
+        getUTCMinutes?: {} | null;
+        getSeconds?: {} | null;
+        getUTCSeconds?: {} | null;
+        getMilliseconds?: {} | null;
+        getUTCMilliseconds?: {} | null;
+        getTimezoneOffset?: {} | null;
+        setTime?: {} | null;
+        setMilliseconds?: {} | null;
+        setUTCMilliseconds?: {} | null;
+        setSeconds?: {} | null;
+        setUTCSeconds?: {} | null;
+        setMinutes?: {} | null;
+        setUTCMinutes?: {} | null;
+        setHours?: {} | null;
+        setUTCHours?: {} | null;
+        setDate?: {} | null;
+        setUTCDate?: {} | null;
+        setMonth?: {} | null;
+        setUTCMonth?: {} | null;
+        setFullYear?: {} | null;
+        setUTCFullYear?: {} | null;
+        toUTCString?: {} | null;
+        toISOString?: {} | null;
+        getVarDate?: {} | null;
+        valueOf?: {} | null;
+    } | null;
+    isActive?: unknown;
 } & {
     _id: mongoose.Types.ObjectId;
 } & {
@@ -187,6 +331,8 @@ export declare const contentModel: mongoose.Model<{
         createFromBase64?: {} | null;
         isValid?: {} | null;
     };
+    createdAt: NativeDate;
+    isActive: boolean;
 }, mongoose.Document<unknown, {}, mongoose.FlatRecord<{
     type: string;
     title: string;
@@ -209,6 +355,8 @@ export declare const contentModel: mongoose.Model<{
         createFromBase64?: {} | null;
         isValid?: {} | null;
     };
+    createdAt: NativeDate;
+    isActive: boolean;
 }>, {}, mongoose.ResolveSchemaOptions<mongoose.DefaultSchemaOptions>> & mongoose.FlatRecord<{
     type: string;
     title: string;
@@ -231,6 +379,8 @@ export declare const contentModel: mongoose.Model<{
         createFromBase64?: {} | null;
         isValid?: {} | null;
     };
+    createdAt: NativeDate;
+    isActive: boolean;
 }> & {
     _id: mongoose.Types.ObjectId;
 } & {
@@ -238,26 +388,38 @@ export declare const contentModel: mongoose.Model<{
 }>>;
 export declare const linkModel: mongoose.Model<{
     userId: mongoose.Types.ObjectId;
+    createdAt: NativeDate;
     hash: string;
+    contentId: mongoose.Types.ObjectId;
 }, {}, {}, {}, mongoose.Document<unknown, {}, {
     userId: mongoose.Types.ObjectId;
+    createdAt: NativeDate;
     hash: string;
+    contentId: mongoose.Types.ObjectId;
 }, {}, mongoose.DefaultSchemaOptions> & {
     userId: mongoose.Types.ObjectId;
+    createdAt: NativeDate;
     hash: string;
+    contentId: mongoose.Types.ObjectId;
 } & {
     _id: mongoose.Types.ObjectId;
 } & {
     __v: number;
 }, mongoose.Schema<any, mongoose.Model<any, any, any, any, any, any>, {}, {}, {}, {}, mongoose.DefaultSchemaOptions, {
     userId: mongoose.Types.ObjectId;
+    createdAt: NativeDate;
     hash: string;
+    contentId: mongoose.Types.ObjectId;
 }, mongoose.Document<unknown, {}, mongoose.FlatRecord<{
     userId: mongoose.Types.ObjectId;
+    createdAt: NativeDate;
     hash: string;
+    contentId: mongoose.Types.ObjectId;
 }>, {}, mongoose.ResolveSchemaOptions<mongoose.DefaultSchemaOptions>> & mongoose.FlatRecord<{
     userId: mongoose.Types.ObjectId;
+    createdAt: NativeDate;
     hash: string;
+    contentId: mongoose.Types.ObjectId;
 }> & {
     _id: mongoose.Types.ObjectId;
 } & {

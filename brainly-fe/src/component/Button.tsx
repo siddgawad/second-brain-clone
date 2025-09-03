@@ -4,7 +4,10 @@ import type { ReactElement } from "react";
 export interface ButtonProps{
     variant:"primary"|"secondary";
     text:string;
-    startIcon:ReactElement;
+    startIcon:ReactElement|null;
+    onClick? : ()=>void;
+    fullWidth?:boolean;
+    loading? :boolean;
 }
 
 const variantClassName={
@@ -14,9 +17,11 @@ const variantClassName={
 
 const defaultStyles = "px-4 py-2 rounded-md font-light flex items-center";
 
-export const Button = ({variant,text,startIcon}:ButtonProps)=>{
+export const Button = ({variant,text,startIcon,onClick,fullWidth,loading}:ButtonProps)=>{
     return(
-        <button className={variantClassName[variant] + " " + defaultStyles}>
+        <button onClick={onClick} className={variantClassName[variant] + " " + defaultStyles + " " +
+            `${fullWidth?"w-full flex justify-center items-center":""} ${loading? "opacity-45": "" }` 
+        } disabled={loading}>
             <div className="pr-2">
             {startIcon}
             </div>

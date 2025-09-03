@@ -12,15 +12,36 @@ if (!JWT_SECRET) {
     throw new Error("JWT_SECRET environment variable is required");
 }
 const userMiddleware = (req, res, next) => {
-    const header = req.headers["authorization"];
-    const decoded = jsonwebtoken_1.default.verify(header, JWT_SECRET);
-    if (decoded) {
-        //@ts-ignore
-        req.userId = decoded.id;
-        next();
+    try {
+        const header = req.headers["authorization"];
+        // Check if authorization header exists
+        if (!header) {
+            return res.status(401).json({ message: "Authorization header is required" });
+        }
+        // Extract token from "Bearer <token>" format
+        const token = header.startsWith("Bearer ") ? header.substring(7) : header;
+        // Verify the token
+        const decoded = jsonwebtoken_1.default.verify(token, JWT_SECRET);
+        // Check if decoded payload contains user id
+        if (decoded && decoded.id) {
+            req.userId = decoded.id;
+            next();
+        }
+        else {
+            return res.status(403).json({ message: "Invalid token payload" });
+        }
     }
-    else {
-        res.status(403).json({ message: "You are not logged in" });
+    catch (error) {
+        // Handle JWT verification errors - incorrect token,expired token,and sewrver error
+        if (error instanceof jsonwebtoken_1.default.JsonWebTokenError) {
+            return res.status(403).json({ message: "Invalid token" });
+        }
+        else if (error instanceof jsonwebtoken_1.default.TokenExpiredError) {
+            return res.status(401).json({ message: "Token has expired" });
+        }
+        else {
+            return res.status(500).json({ message: "Server error during authentication" });
+        }
     }
 };
 exports.userMiddleware = userMiddleware;

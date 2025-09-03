@@ -1,11 +1,24 @@
 @import "tailwindcss";
 
 @theme {
-    --color-purple-100: #e0e7ff;
-    --color-purple-500: #554ad4;
+   
+/*tags font color*/
+    --color-purple-200: #7c74d6
+/*tags bg color*/
+    --color-purple-300: #edf2fe
+/*share brain btn text color*/
+    --color-purple-400: #655cd6;
+ /*share braion btn bg color*/
+    --color-purple-500: #e0e7ff;
+   /*add content bg color*/
     --color-purple-600: #5046e4;
+
+    /*brain icon color */
+    --color-purple-700: #5448d6
     
-    --color-gray-400: #f8fafc;
+   /*content bg color*/
+    --color-gray-100: #f9fbfc;
+    /*sidebar text color*/
     --color-gray-600: #424b4e;
 
 }
