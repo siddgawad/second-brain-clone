@@ -25,7 +25,7 @@ export const tagValidator = z.object({
 });
 
 export const contentValidator = z.object({
-    link: z.url("Must be a valid URL"),
+    link: z.string().url("Must be a valid URL"),
     type: z.enum(['image', 'video', 'article', 'audio'], { message: "Type must be image, video, article, or audio" }),
     title: z.string().min(1, "Minimum 1 character is required").max(100, "Cannot exceed 100 characters limit"),
     tags: z.array(z.string().refine((val) => mongoose.isValidObjectId(val), { message: "Invalid ObjectId" })).optional(),

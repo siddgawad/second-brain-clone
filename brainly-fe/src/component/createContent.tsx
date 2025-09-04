@@ -3,6 +3,7 @@ import { useRef } from "react";
 import CrossIcon from "../icons/CrossIcon";
 import { Button } from "./Button";
 import InputComponent from "./inputComponent";
+import { api } from "../lib/api";
 
 interface Props {
     open: boolean;
@@ -14,13 +15,23 @@ export default function CreateContentModel({ open, onClose }: Props) {
     const linkRef = useRef<HTMLInputElement>(null);
 
     const handleSubmit = () => {
-        const title = titleRef.current?.value;
-        const link = linkRef.current?.value;
+        const title = titleRef.current?.value?.trim();
+        const link = linkRef.current?.value?.trim();
+        if (!title || !link) return alert("Title and Link are required");
+
         
-        // Add your submit logic here
-        console.log({ title, link });
-        onClose();
-    };
+  (async () => {
+    try {
+      const res = await api.post("/api/v1/content", { title, link, type: "article", tags: [] });
+      console.log("Created content", res.data);
+    } catch (error) {
+      console.error("Create content failed", error);
+      alert("Failed to create content");
+    } finally {
+      onClose();
+    }
+  })();
+};
 
     return(
         <div>
