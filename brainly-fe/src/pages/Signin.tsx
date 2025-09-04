@@ -1,51 +1,41 @@
-import { FormEvent, useState } from "react";
+import { useState } from "react";
+import { Button, Card, Input } from "../components/Kit";
+import { signIn } from "../lib/api";
 import { useNavigate, Link } from "react-router-dom";
-import { useAuth } from "../hooks/useAuth";
-import type { AxiosError } from "axios";
-
-function getErrMessage(e: unknown): string {
-  const ax = e as AxiosError<{ message?: string }>;
-  return ax?.response?.data?.message ?? "Sign in failed";
-}
+import { useAuth } from "../context/AuthContext";
 
 export default function SignIn() {
-  const { signin } = useAuth();
+  const [email, setEmail] = useState("");
+  const [pw, setPw] = useState("");
+  const [loading, setLoading] = useState(false);
   const nav = useNavigate();
-  const [err, setErr] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
+  const { setAuthed } = useAuth();
 
-  async function onSubmit(e: FormEvent<HTMLFormElement>) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
-    const form = new FormData(e.currentTarget);
-    const username = String(form.get("username") ?? "");
-    const password = String(form.get("password") ?? "");
-
+    setLoading(true);
     try {
-      setPending(true);
-      setErr(null);
-      await signin(username, password);
+      await signIn(email, pw);
+      setAuthed(true);
       nav("/");
-    } catch (e: unknown) {
-      setErr(getErrMessage(e));
     } finally {
-      setPending(false);
+      setLoading(false);
     }
   }
 
   return (
-    <div className="max-w-md mx-auto bg-white shadow-sm rounded p-6">
-      <h1 className="text-xl font-semibold mb-4">Sign in</h1>
-      <form onSubmit={onSubmit} className="grid gap-3">
-        <input name="username" className="border rounded px-3 py-2" placeholder="Username" />
-        <input name="password" type="password" className="border rounded px-3 py-2" placeholder="Password" />
-        {err && <div className="text-sm text-red-600">{err}</div>}
-        <button disabled={pending} className="px-4 py-2 rounded bg-black text-white disabled:opacity-50">
-          {pending ? "Signing in..." : "Sign in"}
-        </button>
-      </form>
-      <p className="text-sm mt-3">
-        No account? <Link to="/signup" className="underline">Sign up</Link>
-      </p>
+    <div className="min-h-screen grid place-items-center px-4">
+      <Card className="w-full max-w-md p-6">
+        <h1 className="text-xl font-semibold mb-4">Sign in</h1>
+        <form className="space-y-4" onSubmit={submit}>
+          <Input label="Email" type="email" value={email} onChange={setEmail} required />
+          <Input label="Password" type="password" value={pw} onChange={setPw} required />
+          <Button type="submit" text="Sign in" variant="primary" loading={loading} fullWidth />
+        </form>
+        <p className="text-sm text-gray-600 mt-3">
+          No account? <Link to="/signup" className="text-primary-700 hover:underline">Sign up</Link>
+        </p>
+      </Card>
     </div>
   );
 }

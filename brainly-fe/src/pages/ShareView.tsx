@@ -1,46 +1,32 @@
-import { useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
-import axios, { type AxiosError } from "axios";
-
-type Shared = { title: string; link: string; type: string };
-
-function getErrMessage(e: unknown): string {
-  const ax = e as AxiosError<{ message?: string }>;
-  return ax?.response?.data?.message ?? "Not found";
-}
+import { useParams } from "react-router-dom";
+import { fetchShared } from "../lib/api";
+import { ContentItem } from "../lib/types";
+import { NoteCard } from "../components/NoteCard";
 
 export default function ShareView() {
-  const { hash } = useParams();
-  const [data, setData] = useState<Shared | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+  const { slug = "" } = useParams();
+  const [items, setItems] = useState<ContentItem[] | null>(null);
 
   useEffect(() => {
-    let cancelled = false;
     (async () => {
-      try {
-        const base = import.meta.env.VITE_API_BASE as string;
-        const url = `${base.replace(/\/api\/v1$/, "")}/api/v1/brain/${hash}`;
-        const res = await axios.get<Shared>(url);
-        if (!cancelled) setData(res.data);
-      } catch (e: unknown) {
-        if (!cancelled) setErr(getErrMessage(e));
-      }
+      const data = await fetchShared(slug);
+      setItems(data.items ?? data);
     })();
-    return () => {
-      cancelled = true;
-    };
-  }, [hash]);
+  }, [slug]);
 
-  if (err) return <div className="max-w-md mx-auto bg-white p-4 rounded shadow-sm">{err}</div>;
-  if (!data) return <div>Loading…</div>;
+  if (!items) return <div className="p-6 text-gray-600">Loading…</div>;
 
   return (
-    <div className="max-w-xl mx-auto bg-white p-6 rounded shadow-sm">
-      <h1 className="text-xl font-semibold mb-2">{data.title}</h1>
-      <a href={data.link} target="_blank" rel="noreferrer" className="text-blue-600 break-all">
-        {data.link}
-      </a>
-      <div className="text-xs text-neutral-500 mt-2">{data.type}</div>
+    <div className="mx-auto max-w-6xl px-4 md:px-8 py-6">
+      <h1 className="text-2xl font-bold mb-4">Shared Brain</h1>
+      {items.length === 0 ? (
+        <div className="text-sm text-gray-500">No shared items.</div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+          {items.map((it) => <NoteCard key={it._id} item={it} onDelete={() => {}} onShare={() => {}} />)}
+        </div>
+      )}
     </div>
   );
 }

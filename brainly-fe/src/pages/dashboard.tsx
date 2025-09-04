@@ -1,121 +1,110 @@
-import { FormEvent, useEffect, useState, useCallback } from "react";
-import api from "../lib/api";
-import { useAuth } from "../hooks/useAuth";
-import { Link, useNavigate } from "react-router-dom";
-import type { AxiosError } from "axios";
-
-type Item = { _id: string; title: string; link: string; type: string; createdAt: string; tags: string[] };
-
-function getErrMessage(e: unknown): string {
-  const ax = e as AxiosError<{ message?: string }>;
-  return ax?.response?.data?.message ?? "Request failed";
-}
+import React, { useEffect, useMemo, useState } from "react";
+import { Sidebar } from "../components/SideBar";
+import { Topbar } from "../components/TopBar";
+import { AddContentModal } from "../components/AddContentModal";
+import { EmptyState } from "../components/EmptyState";
+import { NoteCard } from "../components/NoteCard";
+import { ContentItem } from "../lib/types";
+import { createContent, deleteContent, listContent, shareContent, shareDashboard } from "../lib/api";
 
 export default function Dashboard() {
-  const { token, ensureFresh } = useAuth();
-  const [items, setItems] = useState<Item[]>([]);
-  const [err, setErr] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [active, setActive] = useState<"all" | "tweets" | "videos" | "documents" | "links" | "tags">("all");
+  const [items, setItems] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const nav = useNavigate();
 
-  const load = useCallback(async () => {
+  async function fetchAll() {
+    setLoading(true);
     try {
-      if (!token) {
-        const t = await ensureFresh();
-        if (!t) return nav("/signin");
-      }
-      const { data } = await api.get<{ items: Item[] }>("/content");
-      setItems(data.items ?? []);
-    } catch (e: unknown) {
-      setErr(getErrMessage(e));
+      const data = await listContent();
+      setItems(data.items ?? data); // supports either {items:[]} or []
     } finally {
       setLoading(false);
     }
-  }, [token, ensureFresh, nav]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  async function onCreate(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const form = new FormData(e.currentTarget);
-    const title = String(form.get("title") ?? "");
-    const link = String(form.get("link") ?? "");
-    const type = String(form.get("type") ?? "article");
-
-    try {
-      const { data } = await api.post<Item>("/content", { title, link, type });
-      setItems((prev) => [data, ...prev]);
-      e.currentTarget.reset();
-    } catch (e: unknown) {
-      setErr(getErrMessage(e));
-    }
   }
 
-  async function onDelete(id: string) {
-    await api.delete(`/content/${id}`);
-    setItems((prev) => prev.filter((i) => i._id !== id));
+  useEffect(() => { fetchAll(); }, []);
+
+  const filtered = useMemo(() => {
+    if (active === "all") return items;
+    if (active === "tweets") return items.filter(it => it.kind === "tweet");
+    if (active === "videos") return items.filter(it => it.kind === "video");
+    if (active === "documents") return items.filter(it => it.kind === "doc");
+    if (active === "links") return items.filter(it => it.kind === "link" || it.kind === "image");
+    if (active === "tags") return items; // we will render a tag-cloud like list below
+    return items;
+  }, [active, items]);
+
+  async function handleSubmit(fd: FormData) {
+    const created = await createContent(fd);
+    setItems((prev) => [created.item ?? created, ...prev]);
   }
 
-  async function onShare(id: string) {
-    const { data } = await api.post<{ hash: string }>(`/brain/${id}`);
-    const url = `${location.origin}/share/${data.hash}`;
+  async function handleDelete(id: string) {
+    await deleteContent(id);
+    setItems((prev) => prev.filter((x) => x._id !== id));
+  }
+
+  async function handleShareCard(id: string) {
+    const { url } = await shareContent(id);
     await navigator.clipboard.writeText(url);
-    alert("Share link copied to clipboard:\n" + url);
+    alert("Share link copied:\n" + url);
   }
 
-  if (loading) return <div>Loading…</div>;
+  async function handleShareAll() {
+    const { url } = await shareDashboard();
+    await navigator.clipboard.writeText(url);
+    alert("Dashboard share link copied:\n" + url);
+  }
+
+  // Build tag index
+  const tagIndex = useMemo(() => {
+    const idx: Record<string, number> = {};
+    items.forEach((i) => i.tags?.forEach((t) => (idx[t] = (idx[t] ?? 0) + 1)));
+    return Object.entries(idx).sort((a, b) => b[1] - a[1]);
+  }, [items]);
 
   return (
-    <div className="grid gap-6">
-      <section className="bg-white rounded shadow-sm p-4">
-        <h2 className="font-semibold mb-3">Add content</h2>
-        <form onSubmit={onCreate} className="grid sm:grid-cols-2 lg:grid-cols-4 gap-2">
-          <input name="title" required placeholder="Title" className="border rounded px-3 py-2" />
-          <input name="link" required placeholder="https://…" className="border rounded px-3 py-2" />
-          <select name="type" className="border rounded px-3 py-2">
-            <option value="article">Article</option>
-            <option value="video">Video</option>
-            <option value="note">Note</option>
-          </select>
-          <button className="px-4 py-2 rounded bg-black text-white">Save</button>
-        </form>
-        {err && <div className="text-sm text-red-600 mt-2">{err}</div>}
-      </section>
+    <div className="h-screen w-full flex">
+      <Sidebar current={active} onChange={(id) => setActive(id as any)} />
+      <div className="flex-1 flex flex-col min-w-0">
+        <Topbar onAdd={() => setModalOpen(true)} onShare={handleShareAll} />
 
-      <section className="bg-white rounded shadow-sm p-4">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="font-semibold">Your items</h2>
-          <span className="text-xs text-neutral-500">{items.length} total</span>
-        </div>
-        <ul className="grid gap-2">
-          {items.map((i) => (
-            <li key={i._id} className="border rounded p-3 flex flex-col sm:flex-row sm:items-center gap-2">
-              <div className="grow">
-                <div className="font-medium">{i.title}</div>
-                <a href={i.link} target="_blank" rel="noreferrer" className="text-sm text-blue-600 break-all">
-                  {i.link}
-                </a>
-                <div className="text-xs text-neutral-500 mt-1">
-                  {new Date(i.createdAt).toLocaleString()} • {i.type}
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <button onClick={() => void onShare(i._id)} className="px-3 py-1.5 rounded border">Share</button>
-                <button onClick={() => void onDelete(i._id)} className="px-3 py-1.5 rounded border text-red-600">
-                  Delete
+        <main className="mx-auto w-full max-w-7xl px-4 md:px-8 py-6">
+          {loading ? (
+            <div className="text-sm text-gray-500">Loading…</div>
+          ) : filtered.length === 0 && active !== "tags" ? (
+            <EmptyState onAdd={() => setModalOpen(true)} />
+          ) : active === "tags" ? (
+            <div className="flex flex-wrap gap-2">
+              {tagIndex.length === 0 ? (
+                <div className="text-sm text-gray-500">No tags yet.</div>
+              ) : tagIndex.map(([tag, count]) => (
+                <button
+                  key={tag}
+                  onClick={() => setActive("all")} // switch back and show all; simple behaviour
+                  className="px-3 py-1 rounded-full bg-primary-50 text-primary-700 text-sm"
+                  title={`${count} items`}
+                >
+                  #{tag} <span className="text-gray-500">({count})</span>
                 </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-        {items.length === 0 && <div className="text-sm text-neutral-500">No items yet. Add your first above.</div>}
-      </section>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+              {filtered.map((it) => (
+                <NoteCard key={it._id} item={it} onDelete={handleDelete} onShare={handleShareCard} />
+              ))}
+            </div>
+          )}
+        </main>
 
-      <section className="text-sm text-neutral-500">
-        Public share example: <Link to="/share/demo" className="underline">/share/demo</Link>
-      </section>
+        <AddContentModal
+          isOpen={modalOpen}
+          onClose={() => setModalOpen(false)}
+          onSubmit={handleSubmit}
+        />
+      </div>
     </div>
   );
 }

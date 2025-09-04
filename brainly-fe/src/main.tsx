@@ -1,24 +1,25 @@
 import React from "react";
-import { createRoot } from "react-dom/client";
-import { RouterProvider, createBrowserRouter } from "react-router-dom";
+import ReactDOM from "react-dom/client";
 import "./index.css";
-import App from "./App";
+import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import { AuthProvider } from "./context/AuthContext";
+import { ProtectedRoute } from "./components/ProtectedRoute";
+import Dashboard from "./pages/dashboard";
 import SignIn from "./pages/Signin";
 import SignUp from "./pages/SignUp";
-import Da
 import ShareView from "./pages/ShareView";
 
 const router = createBrowserRouter([
-  {
-    path: "/",
-    element: <App />,
-    children: [
-      { path: "", element: <Dashboard /> },
-      { path: "signin", element: <SignIn /> },
-      { path: "signup", element: <SignUp /> },
-      { path: "share/:hash", element: <ShareView /> }
-    ]
-  }
+  { path: "/signin", element: <SignIn /> },
+  { path: "/signup", element: <SignUp /> },
+  { element: <ProtectedRoute />, children: [{ path: "/", element: <Dashboard /> }] },
+  { path: "/share/:slug", element: <ShareView /> }
 ]);
 
-createRoot(document.getElementById("root")!).render(<RouterProvider router={router} />);
+ReactDOM.createRoot(document.getElementById("root")!).render(
+  <React.StrictMode>
+    <AuthProvider>
+      <RouterProvider router={router} />
+    </AuthProvider>
+  </React.StrictMode>
+);
