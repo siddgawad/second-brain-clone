@@ -1,61 +1,68 @@
+import "dotenv/config";
 import express from "express";
-import mongoose from "mongoose";
+import cookieParser from "cookie-parser";
+import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
-import cors, { type CorsOptions } from "cors";
 import pinoHttp from "pino-http";
-import cookieParser from "cookie-parser";
+import { collectDefaultMetrics, Registry } from "prom-client";
 
-import { env } from "./env.js";
-import { logger } from "./logger.js";
-import { initRedis } from "./redis.js";
-import { metricsMiddleware, register } from "./metrics.js";
-import { audit } from "./middleware/audit.js";
+import { ENV, IS_PROD, ALLOWED_ORIGINS } from "./env";
+import { connectMongo } from "./db";
+import { pingRedis } from "./redis";
+import { logger } from "./logger";
 
-import { authRouter } from "./routes/auth.js";
-import { contentRouter } from "./routes/content.js";
-import { shareRouter } from "./routes/share.js";
-import { errorHandler } from "./middleware/error.js";
+import authRoutes from "./routes/auth";
+import contentRoutes from "./routes/content";
+import shareRoutes from "./routes/share";
+import { errorHandler } from "./middleware/error";
 
-const app = express();
+async function main() {
+  await connectMongo();
+  await pingRedis();
 
-// CORS
-const allowedOrigins = env.CORS_ORIGIN.split(",").map(s => s.trim());
-const corsOptions: CorsOptions = {
-  credentials: true,
-  origin(origin, cb) {
-    if (!origin) return cb(null, true);
-    if (allowedOrigins.includes(origin)) return cb(null, true);
-    return cb(new Error("Not allowed by CORS"));
-  }
-};
-app.use(cors(corsOptions));
+  const app = express();
 
-app.use(helmet());
-app.use(compression());
-app.use(express.json());
-app.use(cookieParser());
+  app.use(pinoHttp({ logger }));
+  app.use(helmet());
+  app.use(compression());
+  app.use(express.json({ limit: "2mb" }));
+  app.use(cookieParser());
 
-app.use(pinoHttp({ logger }));
-app.use(metricsMiddleware);
-app.use(audit());
+  app.use(
+    cors({
+      origin(origin, cb) {
+        if (!origin) return cb(null, true); // allow tools/curl
+        if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+        return cb(new Error("Not allowed by CORS"));
+      },
+      credentials: true
+    })
+  );
 
-app.get("/healthz", (_req, res) => res.json({ ok: true }));
-app.get("/metrics", async (_req, res) => {
-  res.setHeader("Content-Type", register.contentType);
-  res.send(await register.metrics());
+  app.get("/healthz", (_req, res) => res.json({ ok: true }));
+  app.get("/readyz", (_req, res) => res.json({ ok: true }));
+
+  const registry = new Registry();
+  collectDefaultMetrics({ register: registry });
+  app.get("/metrics", async (_req, res) => {
+    res.setHeader("Content-Type", registry.contentType);
+    res.end(await registry.metrics());
+  });
+
+  // Routes
+  app.use("/api/v1/auth", authRoutes);      // signup/signin/refresh/logout
+  app.use("/api/v1/content", contentRoutes);
+  app.use("/api/v1/share", shareRoutes);
+
+  app.use(errorHandler);
+
+  app.listen(ENV.PORT, () => {
+    logger.info({ port: ENV.PORT, env: ENV.NODE_ENV }, "listening");
+  });
+}
+
+main().catch((e) => {
+  logger.error(e, "fatal");
+  process.exit(1);
 });
-
-app.use("/api/v1", authRouter);
-app.use("/api/v1/content", contentRouter);
-app.use("/api/v1/brain", shareRouter);
-
-app.use((_req, res) => res.status(404).json({ message: "Not found" }));
-app.use(errorHandler);
-
-const start = async () => {
-  await mongoose.connect(env.MONGO_URL);
-  await initRedis();
-  app.listen(env.PORT, () => logger.info({ port: env.PORT }, "listening"));
-};
-start();

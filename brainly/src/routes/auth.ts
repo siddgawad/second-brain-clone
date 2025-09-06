@@ -1,73 +1,135 @@
 import { Router } from "express";
-import bcrypt from "bcrypt";
-import { User } from "../models/User.js";
-import { rateLimit, authLimiter } from "../rateLimit.js";
-import { signAccess, signRefresh, verifyRefresh } from "../utils/tokens.js";
-import cookieParser from "cookie-parser";
-import { env } from "../env.js";
+import { z } from "zod";
+import bcrypt from "bcryptjs";
+import { User } from "../models/User";
+import { authLimiter } from "../middleware/limiter"; // or "../rateLimit" if that's your file
+import {
+  signAccessToken,
+  signRefreshToken,
+  verifyRefreshToken,
+} from "../utils/tokens";
+import {
+  putRefreshJti,
+  getRefreshUserId,
+  delRefreshJti,
+  // getVersion, // optional
+} from "../auth/refreshStore";
+import { ENV, USE_SECURE_COOKIE } from "../env";
 
-export const authRouter = Router();
-authRouter.use(cookieParser());
+const r = Router();
 
-authRouter.post("/signup", rateLimit(authLimiter), async (req, res) => {
-  const { username, password } = req.body || {};
-  if (!username || !password) return res.status(400).json({ message: "username & password required" });
-  const exists = await User.findOne({ username });
-  if (exists) return res.status(409).json({ message: "user exists" });
-  const hash = await bcrypt.hash(password, 10);
-  const user = await User.create({ username, password: hash });
-  return res.json({ id: user._id, username: user.username });
+const credsSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(6),
 });
 
-authRouter.post("/signin", rateLimit(authLimiter), async (req, res) => {
-  const { username, password } = req.body || {};
-  const user = await User.findOne({ username });
-  if (!user) return res.status(401).json({ message: "invalid credentials" });
-  const ok = await bcrypt.compare(password, user.password);
-  if (!ok) return res.status(401).json({ message: "invalid credentials" });
-  const { token: access } = signAccess(String(user._id));
-  const { token: refresh } = await signRefresh(String(user._id));
+// central cookie setter
+function setRefreshCookie(res: any, token: string) {
+  const base = {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: USE_SECURE_COOKIE,
+    path: "/api/v1/auth/refresh",
+  } as Record<string, any>;
+
+  if (ENV.COOKIE_DOMAIN && ENV.COOKIE_DOMAIN !== "localhost") {
+    base.domain = ENV.COOKIE_DOMAIN;
+  }
+  res.cookie("refreshToken", token, base);
+}
+
+function toUserOut(u: { _id: any; email?: string }) {
+  return u.email ? { id: String(u._id), email: u.email } : { id: String(u._id) };
+}
+
+r.post("/signup", authLimiter, async (req, res) => {
+  const parsed = credsSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const { email, password } = parsed.data;
+  const existing = await User.findOne({ email }).lean();
+  if (existing) return res.status(409).json({ error: "Email already in use" });
+
+  const passwordHash = await bcrypt.hash(password, 10);
+  const user = await User.create({ email, passwordHash });
+
+  const accessToken = signAccessToken(user._id.toString(), user.email);
+  // const ver = await getVersion(user._id.toString()); // optional
+  const { token: refresh, jti } = signRefreshToken(user._id.toString());
+
+  // compute TTL from token exp
+  const payload = verifyRefreshToken(refresh);
+  const now = Math.floor(Date.now() / 1000);
+  const ttl = Math.max(1, (payload.exp ?? now) - now);
+  await putRefreshJti(jti, user._id.toString(), ttl);
+
   setRefreshCookie(res, refresh);
-  return res.json({ accessToken: access });
+  res.status(201).json({ accessToken, user: toUserOut(user) });
 });
 
-authRouter.post("/refresh", async (req, res) => {
-  const cookie = req.cookies?.refresh_token;
-  if (!cookie) return res.status(401).json({ message: "no refresh cookie" });
+r.post("/signin", authLimiter, async (req, res) => {
+  const parsed = credsSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const { email, password } = parsed.data;
+  const user = await User.findOne({ email });
+  if (!user) return res.status(401).json({ error: "Invalid credentials" });
+
+  const ok = await bcrypt.compare(password, user.passwordHash);
+  if (!ok) return res.status(401).json({ error: "Invalid credentials" });
+
+  const accessToken = signAccessToken(user._id.toString(), user.email);
+  const { token: refresh, jti } = signRefreshToken(user._id.toString());
+  const payload = verifyRefreshToken(refresh);
+  const now = Math.floor(Date.now() / 1000);
+  const ttl = Math.max(1, (payload.exp ?? now) - now);
+  await putRefreshJti(jti, user._id.toString(), ttl);
+
+  setRefreshCookie(res, refresh);
+  res.json({ accessToken, user: toUserOut(user) });
+});
+
+r.post("/refresh", authLimiter, async (req, res) => {
+  const rt = req.cookies?.refreshToken as string | undefined;
+  if (!rt) return res.status(401).json({ error: "Missing refresh token" });
+
   try {
-    const payload = await verifyRefresh(cookie);
-    const { token: access } = signAccess(payload.sub);
-    const { token: newRefresh } = await signRefresh(payload.sub, payload.rti);
+    const payload = verifyRefreshToken(rt);
+    const jti = payload.jti!;
+    const userId = payload.sub;
+
+    const storedUser = await getRefreshUserId(jti);
+    if (!storedUser || storedUser !== userId) {
+      return res.status(401).json({ error: "Refresh token invalidated" });
+    }
+
+    // Rotate: delete old jti and issue new pair
+    await delRefreshJti(jti);
+
+    const accessToken = signAccessToken(userId);
+    const { token: newRefresh, jti: newJti } = signRefreshToken(userId);
+    const newPayload = verifyRefreshToken(newRefresh);
+    const now = Math.floor(Date.now() / 1000);
+    const ttl = Math.max(1, (newPayload.exp ?? now) - now);
+    await putRefreshJti(newJti, userId, ttl);
+
     setRefreshCookie(res, newRefresh);
-    return res.json({ accessToken: access });
+    res.json({ accessToken });
   } catch {
-    return res.status(401).json({ message: "invalid refresh" });
+    res.status(401).json({ error: "Invalid refresh token" });
   }
 });
 
-authRouter.post("/logout", async (req, res) => {
-  const cookie = req.cookies?.refresh_token;
-  if (cookie) {
+r.post("/logout", async (req, res) => {
+  const rt = req.cookies?.refreshToken as string | undefined;
+  if (rt) {
     try {
-      const payload = await verifyRefresh(cookie);
-      const { redis } = await import("../redis.js");
-      await redis.del(`refresh:${payload.rti}`);
+      const payload = verifyRefreshToken(rt);
+      if (payload.jti) await delRefreshJti(payload.jti);
     } catch {}
   }
-  res.clearCookie("refresh_token", cookieOpts());
-  return res.json({ ok: true });
+  res.clearCookie("refreshToken", { path: "/api/v1/auth/refresh" });
+  res.json({ ok: true });
 });
 
-function setRefreshCookie(res: any, token: string) {
-  res.cookie("refresh_token", token, cookieOpts());
-}
-function cookieOpts() {
-  return {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: (env.SECURE_COOKIE === "true"),
-    domain: env.COOKIE_DOMAIN,
-    path: "/",
-    maxAge: env.REFRESH_TOKEN_TTL * 1000
-  } as const;
-}
+export default r;

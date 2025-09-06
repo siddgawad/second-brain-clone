@@ -1,7 +1,7 @@
-import type { ErrorRequestHandler } from "express";
-import { logger } from "../logger.js";
+import type { Request, Response, NextFunction } from "express";
 
-export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
-  logger.error({ err, path: req.path }, "Unhandled error");
-  res.status(500).json({ message: "Internal server error" });
-};
+export function errorHandler(err: any, _req: Request, res: Response, _next: NextFunction) {
+  console.error(err);
+  if (res.headersSent) return;
+  res.status(err?.status || 500).json({ error: err?.message || "Internal Server Error" });
+}

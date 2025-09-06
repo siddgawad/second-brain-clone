@@ -1,32 +1,38 @@
-import jwt from "jsonwebtoken";
-import { env } from "../env.js";
-import { redis } from "../redis.js";
-import crypto from "crypto";
+import * as jwt from "jsonwebtoken";
+import { randomUUID } from "crypto";
+import { ENV } from "../env";
 
-export type AccessPayload = { sub: string; jti: string };
-export type RefreshPayload = { sub: string; rti: string };
+export type JwtPayload = {
+  sub: string;
+  email?: string;
+  ver?: number;
+  jti?: string;
+  exp?: number;
+  iat?: number;
+};
 
-export function signAccess(userId: string) {
-  const jti = crypto.randomUUID();
-  const token = jwt.sign({ sub: userId, jti } as AccessPayload, env.JWT_SECRET, { expiresIn: env.ACCESS_TOKEN_TTL });
+const ACCESS_SECRET: jwt.Secret = ENV.JWT_SECRET;
+const REFRESH_SECRET: jwt.Secret = ENV.JWT_REFRESH_SECRET ?? ENV.JWT_SECRET;
+
+export function signAccessToken(userId: string, email?: string) {
+  const payload: JwtPayload = { sub: userId };
+  if (email) payload.email = email;
+  // jwt accepts number (seconds) or string ("15m")
+  return jwt.sign(payload, ACCESS_SECRET, { expiresIn: ENV.ACCESS_TOKEN_TTL });
+}
+
+export function verifyAccessToken(token: string) {
+  return jwt.verify(token, ACCESS_SECRET) as JwtPayload;
+}
+
+export function signRefreshToken(userId: string, ver?: number) {
+  const jti = randomUUID();
+  const payload: JwtPayload = { sub: userId, jti };
+  if (typeof ver === "number") payload.ver = ver;
+  const token = jwt.sign(payload, REFRESH_SECRET, { expiresIn: ENV.REFRESH_TOKEN_TTL });
   return { token, jti };
 }
 
-export async function signRefresh(userId: string, oldRti?: string) {
-  if (oldRti) await redis.del(`refresh:${oldRti}`);
-  const rti = crypto.randomUUID();
-  const token = jwt.sign({ sub: userId, rti } as RefreshPayload, env.JWT_SECRET, { expiresIn: env.REFRESH_TOKEN_TTL });
-  await redis.set(`refresh:${rti}`, userId, { EX: env.REFRESH_TOKEN_TTL });
-  return { token, rti };
-}
-
-export function verifyAccess(token: string) {
-  return jwt.verify(token, env.JWT_SECRET) as AccessPayload & jwt.JwtPayload;
-}
-
-export async function verifyRefresh(token: string) {
-  const payload = jwt.verify(token, env.JWT_SECRET) as RefreshPayload & jwt.JwtPayload;
-  const exists = await redis.get(`refresh:${payload.rti}`);
-  if (!exists) throw new Error("refresh token invalidated");
-  return payload;
+export function verifyRefreshToken(token: string) {
+  return jwt.verify(token, REFRESH_SECRET) as JwtPayload;
 }

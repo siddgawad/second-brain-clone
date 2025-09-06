@@ -1,31 +1,41 @@
 import { Router } from "express";
-import { requireAuth, AuthedRequest } from "../middleware/auth.js";
-import { Content } from "../models/Content.js";
-import { rateLimit, contentLimiter } from "../rateLimit.js";
-import { getCache, setCache, delPrefix } from "../cache.js";
+import { z } from "zod";
+import { requireAuth, AuthedRequest } from "../middleware/auth";
+import { Content } from "../models/Content";
+import { contentLimiter } from "../middleware/limiter";
 
-export const contentRouter = Router();
+const r = Router();
 
-contentRouter.get("/", requireAuth, async (req: AuthedRequest, res) => {
-  const key = `content:${req.userId}`;
-  const cached = await getCache<any[]>(key);
-  if (cached) return res.json({ items: cached, cached: true });
-  const items = await Content.find({ userId: req.userId }).sort({ createdAt: -1 }).lean();
-  await setCache(key, items, 30);
+const createSchema = z.object({
+  title: z.string().min(1),
+  type: z.enum(["note", "link", "tweet", "youtube", "image", "pdf"]),
+  link: z.string().url().optional(),
+  text: z.string().optional(),
+  mediaUrl: z.string().url().optional(),
+  tags: z.array(z.string()).optional().default([])
+});
+
+r.get("/", requireAuth, async (req: AuthedRequest, res) => {
+  const { type, tag } = req.query as { type?: string; tag?: string };
+  const q: any = { userId: req.userId };
+  if (type) q.type = type;
+  if (tag) q.tags = tag;
+  const items = await Content.find(q).sort({ createdAt: -1 }).lean();
   res.json({ items });
 });
 
-contentRouter.post("/", requireAuth, rateLimit(contentLimiter), async (req: AuthedRequest, res) => {
-  const { title, link, type="article", tags=[] } = req.body || {};
-  if (!title || !link) return res.status(400).json({ message: "title & link required" });
-  const item = await Content.create({ userId: req.userId, title, link, type, tags });
-  await delPrefix(`content:${req.userId}`);
-  res.status(201).json(item);
+r.post("/", contentLimiter, requireAuth, async (req: AuthedRequest, res) => {
+  const parsed = createSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const doc = await Content.create({ ...parsed.data, userId: req.userId });
+  res.status(201).json({ item: { ...doc.toObject(), id: doc._id } });
 });
 
-contentRouter.delete("/:id", requireAuth, rateLimit(contentLimiter), async (req: AuthedRequest, res) => {
-  const doc = await Content.findOneAndDelete({ _id: req.params.id, userId: req.userId });
-  if (!doc) return res.status(404).json({ message: "not found" });
-  await delPrefix(`content:${req.userId}`);
+r.delete("/:id", requireAuth, async (req: AuthedRequest, res) => {
+  const { id } = req.params;
+  const deleted = await Content.findOneAndDelete({ _id: id, userId: req.userId });
+  if (!deleted) return res.status(404).json({ error: "Not found" });
   res.json({ ok: true });
 });
+
+export default r;

@@ -1,17 +1,12 @@
-import pino, { type LoggerOptions } from "pino";
+import pino, { LoggerOptions } from "pino";
+import { ENV, IS_PROD } from "./env";
 
-const isDev = process.env.NODE_ENV !== "production";
+let options: LoggerOptions = { level: ENV.LOG_LEVEL as any };
 
-const base: LoggerOptions = {
-  level: process.env.LOG_LEVEL ?? "info"
-};
+// With exactOptionalPropertyTypes, don’t set transport: undefined.
+// Only add it in development.
+if (!IS_PROD) {
+  (options as any).transport = { target: "pino-pretty" };
+}
 
-export const logger = isDev
-  ? pino({
-      ...base,
-      transport: {
-        target: "pino-pretty",
-        options: { translateTime: "SYS:standard" }
-      }
-    })
-  : pino(base);
+export const logger = pino(options);

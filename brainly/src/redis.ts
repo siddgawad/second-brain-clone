@@ -1,13 +1,31 @@
-import { createClient } from "redis";
-import { env } from "./env.js";
-import { logger } from "./logger.js";
+// src/redis.ts
+import Redis, { type RedisOptions } from "ioredis";
+import { ENV } from "./env";
 
-export const redis = createClient({ url: env.REDIS_URL });
+const baseOpts: RedisOptions = {
+  lazyConnect: false,
+  // allow commands to run even if a reconnection is in progress
+  maxRetriesPerRequest: null,
+};
 
-redis.on("error", (err) => logger.error({ err }, "Redis error"));
-redis.on("connect", () => logger.info("Redis connecting..."));
-redis.on("ready", () => logger.info("Redis ready"));
+// Prefer REDIS_URL if provided, otherwise default to localhost:6379
+export const redis =
+  ENV.REDIS_URL && ENV.REDIS_URL.trim().length > 0
+    ? new Redis(ENV.REDIS_URL, baseOpts)
+    : new Redis({ host: "127.0.0.1", port: 6379, ...baseOpts });
 
-export async function initRedis() {
-  if (!redis.isOpen) await redis.connect();
+redis.on("connect", () => {
+  console.log("[redis] connected");
+});
+redis.on("error", (e) => {
+  console.error("[redis] error", e);
+});
+
+export async function pingRedis() {
+  try {
+    await redis.ping();
+    return true;
+  } catch {
+    return false;
+  }
 }

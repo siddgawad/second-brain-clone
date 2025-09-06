@@ -1,8 +1,10 @@
-import mongoose from "mongoose";
+import mongoose, { Schema, InferSchemaType } from "mongoose";
 
-const UserSchema = new mongoose.Schema({
-  username: { type: String, unique: true, index: true, required: true },
-  password: { type: String, required: true }
-}, { timestamps: true });
+const userSchema = new Schema({
+  email: { type: String, unique: true, index: true, required: true },
+  passwordHash: { type: String, required: true },
+  createdAt: { type: Date, default: () => new Date() }
+});
 
-export const User = mongoose.model("User", UserSchema);
+export type UserDoc = InferSchemaType<typeof userSchema> & {_id: mongoose.Types.ObjectId};
+export const User = mongoose.model("User", userSchema);

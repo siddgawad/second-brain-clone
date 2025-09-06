@@ -1,41 +1,45 @@
-import { useState } from "react";
-import { Button, Card, Input } from "../components/Kit";
-import { signIn } from "../lib/api";
-import { useNavigate, Link } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
 
-export default function SignIn() {
-  const [email, setEmail] = useState("");
-  const [pw, setPw] = useState("");
-  const [loading, setLoading] = useState(false);
+export default function Signin() {
+  const { doSignIn, loading } = useAuth();
   const nav = useNavigate();
-  const { setAuthed } = useAuth();
+  const [email, setEmail] = useState('');
+  const [password, setPw] = useState('');
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
-    try {
-      await signIn(email, pw);
-      setAuthed(true);
-      nav("/");
-    } finally {
-      setLoading(false);
-    }
+    const res = await doSignIn(email, password);
+    if (res.ok) nav('/');
   }
 
   return (
-    <div className="min-h-screen grid place-items-center px-4">
-      <Card className="w-full max-w-md p-6">
-        <h1 className="text-xl font-semibold mb-4">Sign in</h1>
-        <form className="space-y-4" onSubmit={submit}>
-          <Input label="Email" type="email" value={email} onChange={setEmail} required />
-          <Input label="Password" type="password" value={pw} onChange={setPw} required />
-          <Button type="submit" text="Sign in" variant="primary" loading={loading} fullWidth />
-        </form>
-        <p className="text-sm text-gray-600 mt-3">
-          No account? <Link to="/signup" className="text-primary-700 hover:underline">Sign up</Link>
+    <div className="min-h-screen grid place-items-center">
+      <form onSubmit={submit} className="w-full max-w-sm space-y-4 border p-6 rounded-lg">
+        <h1 className="text-xl font-semibold">Sign in</h1>
+        <input
+          name="email"
+          autoComplete="email"
+          className="w-full border p-2 rounded"
+          placeholder="Email"
+          value={email}
+          onChange={(e)=>setEmail(e.target.value)}
+        />
+        <input
+          name="password"
+          autoComplete="current-password"
+          type="password"
+          className="w-full border p-2 rounded"
+          placeholder="Password"
+          value={password}
+          onChange={(e)=>setPw(e.target.value)}
+        />
+        <button disabled={loading} className="w-full bg-purple-600 text-white py-2 rounded">Sign in</button>
+        <p className="text-sm">
+          No account? <Link to="/signup" className="text-purple-600 hover:underline">Sign up</Link>
         </p>
-      </Card>
+      </form>
     </div>
   );
 }
