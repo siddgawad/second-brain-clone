@@ -1,68 +1,32 @@
-import "dotenv/config";
+// src/index.ts (only the relevant bits shown)
 import express from "express";
 import cookieParser from "cookie-parser";
 import cors from "cors";
-import helmet from "helmet";
-import compression from "compression";
-import pinoHttp from "pino-http";
-import { collectDefaultMetrics, Registry } from "prom-client";
+import { ENV, ALLOWED_ORIGINS } from "./env.js";
+import authRoutes from "./routes/auth.js";
+import contentRoutes from "./routes/content.js";
 
-import { ENV, IS_PROD, ALLOWED_ORIGINS } from "./env";
-import { connectMongo } from "./db";
-import { pingRedis } from "./redis";
-import { logger } from "./logger";
+const app = express();
 
-import authRoutes from "./routes/auth";
-import contentRoutes from "./routes/content";
-import shareRoutes from "./routes/share";
-import { errorHandler } from "./middleware/error";
+app.use(express.json());
+app.use(cookieParser());
+app.use(
+  cors({
+    origin: ALLOWED_ORIGINS,
+    credentials: true,
+  })
+);
 
-async function main() {
-  await connectMongo();
-  await pingRedis();
+// Mount routers
+app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/content", contentRoutes);
 
-  const app = express();
+// Optional: a tiny health check
+app.get("/api/v1/health", (_req, res) => res.json({ ok: true }));
 
-  app.use(pinoHttp({ logger }));
-  app.use(helmet());
-  app.use(compression());
-  app.use(express.json({ limit: "2mb" }));
-  app.use(cookieParser());
+// 404 fallback for unknown API routes
+app.use("/api", (_req, res) => res.status(404).json({ error: "Not Found" }));
 
-  app.use(
-    cors({
-      origin(origin, cb) {
-        if (!origin) return cb(null, true); // allow tools/curl
-        if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
-        return cb(new Error("Not allowed by CORS"));
-      },
-      credentials: true
-    })
-  );
-
-  app.get("/healthz", (_req, res) => res.json({ ok: true }));
-  app.get("/readyz", (_req, res) => res.json({ ok: true }));
-
-  const registry = new Registry();
-  collectDefaultMetrics({ register: registry });
-  app.get("/metrics", async (_req, res) => {
-    res.setHeader("Content-Type", registry.contentType);
-    res.end(await registry.metrics());
-  });
-
-  // Routes
-  app.use("/api/v1/auth", authRoutes);      // signup/signin/refresh/logout
-  app.use("/api/v1/content", contentRoutes);
-  app.use("/api/v1/share", shareRoutes);
-
-  app.use(errorHandler);
-
-  app.listen(ENV.PORT, () => {
-    logger.info({ port: ENV.PORT, env: ENV.NODE_ENV }, "listening");
-  });
-}
-
-main().catch((e) => {
-  logger.error(e, "fatal");
-  process.exit(1);
+app.listen(ENV.PORT, () => {
+  console.log(`[server] listening on ${ENV.PORT}`);
 });

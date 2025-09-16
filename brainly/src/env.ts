@@ -1,60 +1,90 @@
 // src/env.ts
-import { z } from "zod";
+import 'dotenv/config';
+import { z } from 'zod';
 
-/**
- * Load + validate env once, then export convenient constants.
- */
-const EnvSchema = z.object({
-  NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+const RawEnv = z.object({
+  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().default(3000),
 
-  MONGO_URL: z.string().min(1, "MONGO_URL is required"),
-
+  MONGO_URL: z.string().min(1, 'MONGO_URL required'),
   REDIS_URL: z.string().optional(),
 
-  // Auth
-  JWT_SECRET: z.string().min(1, "JWT_SECRET is required"),
-  JWT_REFRESH_SECRET: z.string().optional(), // falls back to JWT_SECRET
+  // Accept either old or new names – we normalize below.
+  JWT_SECRET: z.string().optional(),
+  JWT_REFRESH_SECRET: z.string().optional(),
+  ACCESS_SECRET: z.string().optional(),
+  REFRESH_SECRET: z.string().optional(),
 
-  // TTLs in seconds
-  ACCESS_TOKEN_TTL: z.coerce.number().default(900),       // 15m
-  REFRESH_TOKEN_TTL: z.coerce.number().default(604800),   // 7d (set 2592000 for 30d)
+  ACCESS_TOKEN_TTL: z.coerce.number().default(900),          // seconds
+  REFRESH_TOKEN_TTL: z.coerce.number().default(60 * 60 * 24 * 30),
 
-  // CORS + cookies
-  CORS_ORIGIN: z.string().default("http://localhost:5173"),
+  CORS_ORIGIN: z.string().optional(),   // comma separated
+  ALLOWED_ORIGINS: z.string().optional(), // comma separated
+
   COOKIE_DOMAIN: z.string().optional(),
   SECURE_COOKIE: z
-    .string()
+    .union([z.literal('true'), z.literal('false')])
     .optional()
-    .transform(v => v === "true" || v === "1")
-    .pipe(z.boolean().default(false)),
+    .transform(v => v === 'true'),
 
-  // Logging
-  LOG_LEVEL: z.string().default("info"),
+  LOG_LEVEL: z.string().default('info')
 });
 
-const parsed = EnvSchema.safeParse(process.env);
-if (!parsed.success) {
-  console.error("❌ Invalid environment variables:", parsed.error.format());
+const raw = RawEnv.safeParse(process.env);
+if (!raw.success) {
+  console.error('❌ Invalid environment variables:', raw.error.format());
+  process.exit(1);
+}
+const r = raw.data;
+
+// Normalize secrets (support both naming schemes)
+const ACCESS_SECRET = r.ACCESS_SECRET ?? r.JWT_SECRET ?? '';
+const REFRESH_SECRET = r.REFRESH_SECRET ?? r.JWT_REFRESH_SECRET ?? r.JWT_SECRET ?? '';
+
+if (!ACCESS_SECRET) {
+  console.error('❌ Missing ACCESS_SECRET or JWT_SECRET in .env');
+  process.exit(1);
+}
+if (!REFRESH_SECRET) {
+  console.error('❌ Missing REFRESH_SECRET or JWT_REFRESH_SECRET (or JWT_SECRET) in .env');
   process.exit(1);
 }
 
-export const ENV = parsed.data;
+export const IS_PROD = r.NODE_ENV === 'production';
+export const PORT = r.PORT;
+export const MONGO_URL = r.MONGO_URL;
+export const REDIS_URL = r.REDIS_URL;
 
-// Derived/normalized values
-export const ACCESS_SECRET = ENV.JWT_SECRET;
-export const REFRESH_SECRET = ENV.JWT_REFRESH_SECRET ?? ENV.JWT_SECRET;
+export const ACCESS_TOKEN_TTL_S = r.ACCESS_TOKEN_TTL;
+export const REFRESH_TOKEN_TTL_S = r.REFRESH_TOKEN_TTL;
 
-export const ACCESS_TOKEN_TTL_S = ENV.ACCESS_TOKEN_TTL;
-export const REFRESH_TOKEN_TTL_S = ENV.REFRESH_TOKEN_TTL;
+export const COOKIE_DOMAIN = r.COOKIE_DOMAIN;
+export const USE_SECURE_COOKIE = typeof r.SECURE_COOKIE === 'boolean'
+  ? r.SECURE_COOKIE
+  : IS_PROD;
 
-export const USE_SECURE_COOKIE = ENV.SECURE_COOKIE;
-
-// Split comma-separated origins
-export const CORS_ORIGINS = ENV.CORS_ORIGIN.split(",")
+const originsStr = r.ALLOWED_ORIGINS ?? r.CORS_ORIGIN ?? '';
+export const ALLOWED_ORIGINS = originsStr
+  .split(',')
   .map(s => s.trim())
   .filter(Boolean);
 
-// Aliases to match the rest of your codebase
-export const ALLOWED_ORIGINS = CORS_ORIGINS;
-export const IS_PROD = ENV.NODE_ENV === "production";
+export const LOG_LEVEL = r.LOG_LEVEL;
+
+// For modules that still expect a single ENV object:
+export const ENV = {
+  NODE_ENV: r.NODE_ENV,
+  PORT,
+  MONGO_URL,
+  REDIS_URL,
+  ACCESS_SECRET,
+  REFRESH_SECRET,
+  ACCESS_TOKEN_TTL_S,
+  REFRESH_TOKEN_TTL_S,
+  COOKIE_DOMAIN,
+  USE_SECURE_COOKIE,
+  ALLOWED_ORIGINS,
+  LOG_LEVEL
+};
+
+export { ACCESS_SECRET, REFRESH_SECRET };

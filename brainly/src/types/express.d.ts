@@ -1,15 +1,8 @@
+// src/types/express.d.ts
 import "express";
 
-declare global {
-  namespace Express {
-    interface AuthUser {
-      id: string;
-      email?: string;
-    }
-    interface Request {
-      user?: AuthUser;
-    }
+declare module "express-serve-static-core" {
+  interface Request {
+    user?: { id: string; email?: string };
   }
 }
-
-export {};

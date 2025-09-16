@@ -1,48 +1,33 @@
-import { redis } from "../redis";
+// src/auth/refreshStore.ts
+import { redis } from '../redis';
 
-/**
- * ---------- Refresh JTI store ----------
- * rt:<jti> -> userId (with TTL)
- * Supports both ioredis and node-redis v4 signatures.
- */
+/** ======== JTI <-> user mapping (for rotation) ======== */
 export async function putRefreshJti(jti: string, userId: string, ttlSeconds: number) {
-  const r: any = redis as any;
-
-  // Try ioredis-style: set key value "EX" ttl
-  try {
-    // ioredis succeeds with this signature
-    await r.set(`rt:${jti}`, userId, "EX", ttlSeconds);
-  } catch {
-    // node-redis v4: set key value { EX: ttl }
-    await r.set(`rt:${jti}`, userId, { EX: ttlSeconds });
-  }
+  // ioredis signature uses positional args: 'EX', ttl
+  await redis.set(`rt:${jti}`, userId, 'EX', ttlSeconds);
 }
 
-export async function getRefreshUserId(jti: string): Promise<string | null> {
-  return (redis as any).get(`rt:${jti}`);
+export function getRefreshUserId(jti: string) {
+  return redis.get(`rt:${jti}`);
 }
 
-export async function delRefreshJti(jti: string): Promise<number> {
-  return (redis as any).del(`rt:${jti}`);
+export function delRefreshJti(jti: string) {
+  return redis.del(`rt:${jti}`);
 }
 
-/**
- * ---------- User version store ----------
- * uv:<userId> -> integer version
- * Used to invalidate older refresh tokens by bumping the version.
- */
-export async function setVersion(userId: string, ver: number): Promise<void> {
-  await (redis as any).set(`uv:${userId}`, String(ver));
-}
-
+/** ======== Per-user refresh version (global logout) ======== */
+/** Current version for a user. Default 0 if unset. */
 export async function getVersion(userId: string): Promise<number> {
-  const raw = await (redis as any).get(`uv:${userId}`);
-  return raw ? Number(raw) : 0;
+  const v = await redis.get(`rv:${userId}`);
+  return v ? parseInt(v, 10) : 0;
 }
 
+/** Set an explicit version (rarely needed). */
+export async function setVersion(userId: string, ver: number): Promise<void> {
+  await redis.set(`rv:${userId}`, String(ver));
+}
+
+/** Atomically increment version to invalidate all existing refresh tokens. */
 export async function bumpVersion(userId: string): Promise<number> {
-  // INCR creates key with value 0 before incrementing if it doesn't exist
-  const v = await (redis as any).incr(`uv:${userId}`);
-  // node-redis returns number, ioredis returns number too; coerce just in case:
-  return typeof v === "number" ? v : Number(v);
+  return redis.incr(`rv:${userId}`);
 }

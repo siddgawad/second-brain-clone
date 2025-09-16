@@ -1,38 +1,35 @@
-import * as jwt from "jsonwebtoken";
-import { randomUUID } from "crypto";
-import { ENV } from "../env";
+// src/utils/tokens.ts
+import * as jwt from 'jsonwebtoken';
+import crypto from 'node:crypto';
+import {
+  ACCESS_SECRET,
+  REFRESH_SECRET,
+  ACCESS_TOKEN_TTL_S,
+  REFRESH_TOKEN_TTL_S
+} from '../env';
 
-export type JwtPayload = {
-  sub: string;
-  email?: string;
-  ver?: number;
-  jti?: string;
-  exp?: number;
-  iat?: number;
-};
+export type JwtPayload = { sub: string; email?: string; ver?: number; jti?: string; exp?: number };
 
-const ACCESS_SECRET: jwt.Secret = ENV.JWT_SECRET;
-const REFRESH_SECRET: jwt.Secret = ENV.JWT_REFRESH_SECRET ?? ENV.JWT_SECRET;
+// Explicit secrets satisfy typings
+const ACCESS_KEY: jwt.Secret = ACCESS_SECRET;
+const REFRESH_KEY: jwt.Secret = REFRESH_SECRET;
 
 export function signAccessToken(userId: string, email?: string) {
-  const payload: JwtPayload = { sub: userId };
-  if (email) payload.email = email;
-  // jwt accepts number (seconds) or string ("15m")
-  return jwt.sign(payload, ACCESS_SECRET, { expiresIn: ENV.ACCESS_TOKEN_TTL });
+  const payload: JwtPayload = email ? { sub: userId, email } : { sub: userId };
+  return jwt.sign(payload, ACCESS_KEY, { expiresIn: ACCESS_TOKEN_TTL_S });
 }
 
-export function verifyAccessToken(token: string) {
-  return jwt.verify(token, ACCESS_SECRET) as JwtPayload;
+export function verifyAccessToken<T extends object = {}>(token: string) {
+  return jwt.verify(token, ACCESS_KEY) as jwt.JwtPayload & JwtPayload & T;
 }
 
-export function signRefreshToken(userId: string, ver?: number) {
-  const jti = randomUUID();
-  const payload: JwtPayload = { sub: userId, jti };
-  if (typeof ver === "number") payload.ver = ver;
-  const token = jwt.sign(payload, REFRESH_SECRET, { expiresIn: ENV.REFRESH_TOKEN_TTL });
+export function signRefreshToken(userId: string, ver: number = 0) {
+  const jti = crypto.randomUUID();
+  const payload: JwtPayload = { sub: userId, ver, jti };
+  const token = jwt.sign(payload, REFRESH_KEY, { expiresIn: REFRESH_TOKEN_TTL_S });
   return { token, jti };
 }
 
 export function verifyRefreshToken(token: string) {
-  return jwt.verify(token, REFRESH_SECRET) as JwtPayload;
+  return jwt.verify(token, REFRESH_KEY) as jwt.JwtPayload & JwtPayload;
 }
